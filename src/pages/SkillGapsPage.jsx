@@ -1,0 +1,32 @@
+import { Link } from 'react-router-dom'
+import { ArrowRight, CheckCircle2, CircleAlert, Target, TrendingUp } from 'lucide-react'
+import { calculateSkillGaps } from '../data/skillEngine'
+import { useStudent } from '../context/StudentContext'
+
+function Metric({ label, value, note, icon: Icon }) {
+  return <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><span className="text-xs font-medium text-slate-500">{label}</span><Icon size={18} className="text-cyan-700"/></div><p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{value}</p><p className="mt-1 text-[11px] text-slate-500">{note}</p></div>
+}
+
+export default function SkillGapsPage() {
+  const { student } = useStudent()
+  const report = calculateSkillGaps(student.targetCareer, student.assessedSkills || {})
+  const hasAssessment = Boolean(student.assessmentResults)
+  const rows = report.rows
+  return <div className="mx-auto max-w-5xl space-y-6">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[.15em] text-cyan-700">Career readiness insights</p><h2 className="mt-1 text-2xl font-bold text-slate-900">Skill gap analysis</h2><p className="mt-2 text-sm text-slate-500">Your demonstrated skills compared with {student.targetCareer} requirements.</p></div><Link to="/assessment" className="inline-flex items-center gap-2 self-start rounded-xl bg-slate-900 px-4 py-3 text-xs font-bold text-white hover:bg-cyan-800">{hasAssessment ? 'Retake assessment' : 'Start assessment'} <ArrowRight size={14}/></Link></div>
+
+    {!hasAssessment && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5"><div className="flex items-center gap-2 font-bold text-amber-900"><CircleAlert size={18}/> No assessment submitted yet</div><p className="mt-2 text-sm leading-6 text-amber-800">The report currently treats unassessed skills as 0 demonstrated points. Complete the assessment to replace these baseline values with your quiz results.</p></div>}
+
+    <div className="grid gap-4 sm:grid-cols-3"><Metric label="Skill coverage" value={`${report.coverage}%`} note="Weighted coverage against required levels" icon={Target}/><Metric label="Average demonstrated score" value={`${report.averageScore}%`} note={`${report.assessedCount} of ${rows.length} skills assessed`} icon={TrendingUp}/><Metric label="Skills to strengthen" value={report.missingSkills.length} note="Ranked by gap × importance" icon={CircleAlert}/></div>
+
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-bold text-slate-900">Skill-by-skill comparison</h3><p className="mt-1 text-xs text-slate-500">Current demonstrated level vs. target requirement</p></div><span className="rounded-full bg-cyan-50 px-3 py-1.5 text-[10px] font-bold text-cyan-800">{student.targetCareer}</span></div>
+      <div className="mt-5 space-y-5">{rows.map((item) => <div key={item.skill}><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><span className="text-sm font-semibold text-slate-800">{item.skill}</span><span className="ml-2 text-[10px] text-slate-400">Weight {item.weight.toFixed(1)}×</span></div><div className="text-xs tabular-nums"><strong className="text-slate-900">{item.current}%</strong><span className="text-slate-400"> / {item.required}% required</span></div></div><div className="relative h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="absolute inset-y-0 left-0 rounded-full bg-cyan-500" style={{ width: `${item.current}%` }}/><div className="absolute inset-y-0 w-0.5 bg-slate-900/70" style={{ left: `${item.required}%` }} title={`Required: ${item.required}%`}/></div><div className="mt-1.5 flex items-center justify-between text-[10px]"><span className={item.matched ? 'text-emerald-700' : 'text-amber-700'}>{item.matched ? 'Assessment matched' : 'Not assessed'}</span><span className={item.gap === 0 ? 'font-semibold text-emerald-700' : 'text-slate-500'}>{item.gap === 0 ? 'On target' : `${item.gap} point gap`}</span></div></div>)}</div>
+    </section>
+
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between gap-3"><div><h3 className="font-bold text-slate-900">Priority learning order</h3><p className="mt-1 text-xs text-slate-500">Priority score = skill gap × career importance weight</p></div><TrendingUp size={19} className="text-cyan-700"/></div>
+      <div className="mt-4 space-y-3">{report.missingSkills.length ? report.missingSkills.map((item, index) => <div key={item.skill} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 p-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600">{index + 1}</span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-800">{item.skill}</p><p className="mt-0.5 text-[10px] text-slate-500">{item.current}% current · {item.required}% target · score {item.priorityScore}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${item.priority === 'High' ? 'bg-rose-50 text-rose-700' : item.priority === 'Medium' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{item.priority} priority</span></div>) : <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800"><CheckCircle2 size={18}/> All assessed skills meet the current prototype targets.</div>}</div>
+    </section>
+
+    <section className="rounded-2xl bg-[#101827] p-5 text-white"><h3 className="font-bold">How SkillBridge calculates coverage</h3><p className="mt-2 text-sm leading-6 text-slate-300">For each skill, SkillBridge counts only the portion of your demonstrated score that reaches the required level. It then applies the career importance weight and divides by the total weighted requirement. Self-reported confidence is shown separately and does not inflate this result.</p><div className="mt-3 rounded-xl bg-white/5 p-3 font-mono text-xs text-cyan-200">Coverage = Σ[min(current, required) ÷ required × weight] ÷ Σ(weight) × 100</div><p className="mt-3 text-[10px] leading-4 text-slate-400">The requirement levels and weights are editable prototype assumptions for demonstration, not verified industry standards.</p></section>
+  </div>
+}

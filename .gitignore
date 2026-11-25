@@ -1,0 +1,23 @@
+node_modules
+dist
+.env
+.DS_Store
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Environment and secrets
+.env
+.env.*
+.skillbridge_secret
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Build files
+node_modules/
+dist/
