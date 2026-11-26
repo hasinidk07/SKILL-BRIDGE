@@ -5,11 +5,13 @@ import os
 import jwt
 import re
 import secrets
+
 from pwdlib import PasswordHash
 
-
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
+
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -21,6 +23,7 @@ from models import (
     ProjectRecord,
     Achievement
 )
+
 
 # ==========================================
 # AUTHENTICATION CONFIGURATION
@@ -44,6 +47,10 @@ else:
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
 # ==========================================
 # DATABASE INITIALIZATION
 # ==========================================
@@ -67,7 +74,9 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:5174",
-        "http://127.0.0.1:5174"
+        "http://127.0.0.1:5174",
+        "http://localhost:5175",
+        "http://127.0.0.1:5175"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -114,6 +123,7 @@ class ProjectRequest(BaseModel):
     project_url: str = ""
     status: str = "Completed"
 
+
 class RegisterRequest(BaseModel):
     name: str
     email: str
@@ -125,465 +135,148 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+
 # ==========================================
 # LEARNING CURRICULUM
-# Ordered steps represent learning prerequisites
 # ==========================================
 
 CURRICULUM = {
     "Programming": [
-        (
-            "Programming Fundamentals",
-            "Learn variables, data types, conditions and loops.",
-            "Programming beginner lessons",
-            2
-        ),
-        (
-            "Functions and Problem Solving",
-            "Practice functions and solve basic coding problems.",
-            "Programming exercises",
-            3
-        ),
-        (
-            "Programming Mini Project",
-            "Build a small application using programming concepts.",
-            "Beginner programming projects",
-            4
-        )
+        ("Programming Fundamentals", "Learn variables, data types, conditions and loops.", "Programming beginner lessons", 2),
+        ("Functions and Problem Solving", "Practice functions and solve basic coding problems.", "Programming exercises", 3),
+        ("Programming Mini Project", "Build a small application using programming concepts.", "Beginner programming projects", 4)
     ],
 
     "Python": [
-        (
-            "Python Fundamentals",
-            "Learn variables, data types, conditions and loops.",
-            "Python beginner tutorials",
-            3
-        ),
-        (
-            "Python Data Structures",
-            "Practice lists, tuples, dictionaries and sets.",
-            "Python practice exercises",
-            3
-        ),
-        (
-            "Python Mini Project",
-            "Build a small application using Python.",
-            "Python project practice",
-            4
-        )
+        ("Python Fundamentals", "Learn variables, data types, conditions and loops.", "Python beginner tutorials", 3),
+        ("Python Data Structures", "Practice lists, tuples, dictionaries and sets.", "Python practice exercises", 3),
+        ("Python Mini Project", "Build a small application using Python.", "Python project practice", 4)
     ],
 
     "C/C++": [
-        (
-            "C/C++ Fundamentals",
-            "Learn variables, operators, conditions and loops.",
-            "C/C++ beginner lessons",
-            3
-        ),
-        (
-            "Functions and Arrays",
-            "Practice functions, arrays and strings.",
-            "C/C++ exercises",
-            3
-        ),
-        (
-            "C/C++ Mini Project",
-            "Create a small console-based application.",
-            "C/C++ project practice",
-            4
-        )
+        ("C/C++ Fundamentals", "Learn variables, operators, conditions and loops.", "C/C++ beginner lessons", 3),
+        ("Functions and Arrays", "Practice functions, arrays and strings.", "C/C++ exercises", 3),
+        ("C/C++ Mini Project", "Create a small console-based application.", "C/C++ project practice", 4)
     ],
 
     "Problem Solving": [
-        (
-            "Problem Decomposition",
-            "Break large problems into smaller steps.",
-            "Problem solving exercises",
-            2
-        ),
-        (
-            "Algorithm Practice",
-            "Practice basic algorithms and logical problems.",
-            "Algorithm exercises",
-            3
-        )
+        ("Problem Decomposition", "Break large problems into smaller steps.", "Problem solving exercises", 2),
+        ("Algorithm Practice", "Practice basic algorithms and logical problems.", "Algorithm exercises", 3)
     ],
 
     "Data Structures": [
-        (
-            "Arrays and Strings",
-            "Understand arrays and string operations.",
-            "Data structures tutorials",
-            3
-        ),
-        (
-            "Stacks and Queues",
-            "Learn stack and queue operations.",
-            "Data structures exercises",
-            3
-        )
+        ("Arrays and Strings", "Understand arrays and string operations.", "Data structures tutorials", 3),
+        ("Stacks and Queues", "Learn stack and queue operations.", "Data structures exercises", 3)
     ],
 
     "Git": [
-        (
-            "Git Fundamentals",
-            "Understand repositories, commits and branches.",
-            "Git beginner guide",
-            2
-        ),
-        (
-            "GitHub Workflow",
-            "Create repositories and manage project changes.",
-            "GitHub documentation",
-            2
-        )
+        ("Git Fundamentals", "Understand repositories, commits and branches.", "Git beginner guide", 2),
+        ("GitHub Workflow", "Create repositories and manage project changes.", "GitHub documentation", 2)
     ],
 
     "SQL": [
-        (
-            "SQL Fundamentals",
-            "Learn SELECT, INSERT, UPDATE and DELETE.",
-            "SQL beginner tutorials",
-            2
-        ),
-        (
-            "SQL Queries and Joins",
-            "Practice filtering, grouping and joining tables.",
-            "SQL exercises",
-            3
-        ),
-        (
-            "Database Mini Project",
-            "Create a database and retrieve useful information.",
-            "Database project practice",
-            4
-        )
+        ("SQL Fundamentals", "Learn SELECT, INSERT, UPDATE and DELETE.", "SQL beginner tutorials", 2),
+        ("SQL Queries and Joins", "Practice filtering, grouping and joining tables.", "SQL exercises", 3),
+        ("Database Mini Project", "Create a database and retrieve useful information.", "Database project practice", 4)
     ],
 
     "Excel": [
-        (
-            "Spreadsheet Fundamentals",
-            "Learn cells, formulas and formatting.",
-            "Excel beginner tutorials",
-            2
-        ),
-        (
-            "Formulas and Charts",
-            "Practice formulas and create charts.",
-            "Excel exercises",
-            3
-        )
+        ("Spreadsheet Fundamentals", "Learn cells, formulas and formatting.", "Excel beginner tutorials", 2),
+        ("Formulas and Charts", "Practice formulas and create charts.", "Excel exercises", 3)
     ],
 
     "Statistics": [
-        (
-            "Descriptive Statistics",
-            "Learn mean, median, mode and range.",
-            "Statistics lessons",
-            3
-        ),
-        (
-            "Data Interpretation",
-            "Interpret simple datasets and results.",
-            "Statistics exercises",
-            3
-        )
+        ("Descriptive Statistics", "Learn mean, median, mode and range.", "Statistics lessons", 3),
+        ("Data Interpretation", "Interpret simple datasets and results.", "Statistics exercises", 3)
     ],
 
     "Data Visualization": [
-        (
-            "Chart Fundamentals",
-            "Learn when to use bar, line and pie charts.",
-            "Data visualization tutorials",
-            2
-        ),
-        (
-            "Dashboard Creation",
-            "Present data using meaningful visualizations.",
-            "Dashboard project practice",
-            4
-        )
+        ("Chart Fundamentals", "Learn when to use bar, line and pie charts.", "Data visualization tutorials", 2),
+        ("Dashboard Creation", "Present data using meaningful visualizations.", "Dashboard project practice", 4)
     ],
 
     "Machine Learning": [
-        (
-            "Machine Learning Fundamentals",
-            "Understand datasets, features and model training.",
-            "Machine learning tutorials",
-            3
-        ),
-        (
-            "Supervised Learning",
-            "Learn classification and regression.",
-            "Machine learning exercises",
-            4
-        ),
-        (
-            "Machine Learning Mini Project",
-            "Train and evaluate a beginner model.",
-            "Beginner ML projects",
-            5
-        )
+        ("Machine Learning Fundamentals", "Understand datasets, features and model training.", "Machine learning tutorials", 3),
+        ("Supervised Learning", "Learn classification and regression.", "Machine learning exercises", 4),
+        ("Machine Learning Mini Project", "Train and evaluate a beginner model.", "Beginner ML projects", 5)
     ],
 
     "Mathematics": [
-        (
-            "Essential Mathematics",
-            "Revise algebra, functions and equations.",
-            "Mathematics lessons",
-            3
-        ),
-        (
-            "Applied Mathematics",
-            "Study mathematical concepts used in computing.",
-            "Applied mathematics exercises",
-            4
-        )
+        ("Essential Mathematics", "Revise algebra, functions and equations.", "Mathematics lessons", 3),
+        ("Applied Mathematics", "Study mathematical concepts used in computing.", "Applied mathematics exercises", 4)
     ],
 
     "Microcontrollers": [
-        (
-            "Microcontroller Fundamentals",
-            "Understand processors, memory and input/output.",
-            "Microcontroller tutorials",
-            3
-        ),
-        (
-            "Embedded Programming",
-            "Understand software and hardware interaction.",
-            "Embedded systems lessons",
-            4
-        )
+        ("Microcontroller Fundamentals", "Understand processors, memory and input/output.", "Microcontroller tutorials", 3),
+        ("Embedded Programming", "Understand software and hardware interaction.", "Embedded systems lessons", 4)
     ],
 
     "Electronics": [
-        (
-            "Electronic Components",
-            "Learn resistors, capacitors and basic components.",
-            "Electronics lessons",
-            3
-        ),
-        (
-            "Circuit Fundamentals",
-            "Study basic circuits and measurements.",
-            "Circuit practice",
-            3
-        )
+        ("Electronic Components", "Learn resistors, capacitors and basic components.", "Electronics lessons", 3),
+        ("Circuit Fundamentals", "Study basic circuits and measurements.", "Circuit practice", 3)
     ],
 
     "Debugging": [
-        (
-            "Debugging Fundamentals",
-            "Learn how to identify programming errors.",
-            "Debugging tutorials",
-            2
-        ),
-        (
-            "Testing and Debugging",
-            "Test programs and fix common errors.",
-            "Debugging exercises",
-            3
-        )
+        ("Debugging Fundamentals", "Learn how to identify programming errors.", "Debugging tutorials", 2),
+        ("Testing and Debugging", "Test programs and fix common errors.", "Debugging exercises", 3)
     ],
 
     "Digital Logic": [
-        (
-            "Logic Gates",
-            "Study AND, OR, NOT and other logic gates.",
-            "Digital logic tutorials",
-            2
-        ),
-        (
-            "Boolean Algebra",
-            "Practice Boolean expressions and truth tables.",
-            "Digital logic exercises",
-            3
-        )
+        ("Logic Gates", "Study AND, OR, NOT and other logic gates.", "Digital logic tutorials", 2),
+        ("Boolean Algebra", "Practice Boolean expressions and truth tables.", "Digital logic exercises", 3)
     ],
 
     "Verilog": [
-        (
-            "Verilog Fundamentals",
-            "Learn modules, ports and basic syntax.",
-            "Verilog tutorials",
-            3
-        ),
-        (
-            "Digital Design Practice",
-            "Describe simple digital circuits.",
-            "Verilog exercises",
-            4
-        )
+        ("Verilog Fundamentals", "Learn modules, ports and basic syntax.", "Verilog tutorials", 3),
+        ("Digital Design Practice", "Describe simple digital circuits.", "Verilog exercises", 4)
     ],
 
     "Semiconductor Basics": [
-        (
-            "Semiconductor Fundamentals",
-            "Understand conductors, insulators and semiconductors.",
-            "Semiconductor lessons",
-            3
-        ),
-        (
-            "Semiconductor Devices",
-            "Explore basic diode and transistor concepts.",
-            "Electronics resources",
-            3
-        )
+        ("Semiconductor Fundamentals", "Understand conductors, insulators and semiconductors.", "Semiconductor lessons", 3),
+        ("Semiconductor Devices", "Explore basic diode and transistor concepts.", "Electronics resources", 3)
     ],
 
     "Verification": [
-        (
-            "Design Verification Fundamentals",
-            "Learn specifications, test cases and verification.",
-            "Verification tutorials",
-            3
-        ),
-        (
-            "Test Scenario Practice",
-            "Create test cases for simple digital designs.",
-            "Verification exercises",
-            4
-        )
+        ("Design Verification Fundamentals", "Learn specifications, test cases and verification.", "Verification tutorials", 3),
+        ("Test Scenario Practice", "Create test cases for simple digital designs.", "Verification exercises", 4)
     ],
 
     "Networking": [
-        (
-            "Networking Fundamentals",
-            "Learn IP addresses, protocols and network devices.",
-            "Networking tutorials",
-            3
-        ),
-        (
-            "Network Communication",
-            "Understand how devices exchange information.",
-            "Networking exercises",
-            3
-        )
+        ("Networking Fundamentals", "Learn IP addresses, protocols and network devices.", "Networking tutorials", 3),
+        ("Network Communication", "Understand how devices exchange information.", "Networking exercises", 3)
     ],
 
     "Sensors": [
-        (
-            "Sensor Fundamentals",
-            "Learn sensor types and measured quantities.",
-            "Sensor tutorials",
-            2
-        ),
-        (
-            "Sensor Applications",
-            "Explore sensors used in electronic systems.",
-            "Sensor project examples",
-            3
-        )
+        ("Sensor Fundamentals", "Learn sensor types and measured quantities.", "Sensor tutorials", 2),
+        ("Sensor Applications", "Explore sensors used in electronic systems.", "Sensor project examples", 3)
     ],
 
     "Cloud Basics": [
-        (
-            "Cloud Computing Fundamentals",
-            "Understand cloud services, storage and computing.",
-            "Cloud tutorials",
-            3
-        ),
-        (
-            "Cloud Applications",
-            "Explore applications using cloud services.",
-            "Cloud practice",
-            3
-        )
+        ("Cloud Computing Fundamentals", "Understand cloud services, storage and computing.", "Cloud tutorials", 3),
+        ("Cloud Applications", "Explore applications using cloud services.", "Cloud practice", 3)
     ],
 
     "Control Systems": [
-        (
-            "Control System Fundamentals",
-            "Understand input, output and feedback.",
-            "Control systems lessons",
-            3
-        ),
-        (
-            "Feedback Systems",
-            "Explore open-loop and closed-loop systems.",
-            "Control systems exercises",
-            4
-        )
+        ("Control System Fundamentals", "Understand input, output and feedback.", "Control systems lessons", 3),
+        ("Feedback Systems", "Explore open-loop and closed-loop systems.", "Control systems exercises", 4)
     ],
 
     "ROS": [
-        (
-            "ROS Fundamentals",
-            "Understand the purpose and structure of ROS.",
-            "ROS tutorials",
-            3
-        ),
-        (
-            "ROS Communication",
-            "Learn nodes, topics and communication.",
-            "ROS exercises",
-            4
-        )
+        ("ROS Fundamentals", "Understand the purpose and structure of ROS.", "ROS tutorials", 3),
+        ("ROS Communication", "Learn nodes, topics and communication.", "ROS exercises", 4)
     ],
 
     "Signal Processing": [
-        (
-            "Signal Fundamentals",
-            "Understand signals and their basic properties.",
-            "Signal processing lessons",
-            3
-        ),
-        (
-            "Basic Signal Filtering",
-            "Explore filtering and frequency concepts.",
-            "Signal processing exercises",
-            4
-        )
+        ("Signal Fundamentals", "Understand signals and their basic properties.", "Signal processing lessons", 3),
+        ("Basic Signal Filtering", "Explore filtering and frequency concepts.", "Signal processing exercises", 4)
     ],
 
     "Wireless Systems": [
-        (
-            "Wireless Communication",
-            "Understand wireless transmission concepts.",
-            "Wireless communication lessons",
-            3
-        ),
-        (
-            "Wireless Technologies",
-            "Study common wireless communication systems.",
-            "Wireless systems tutorials",
-            3
-        )
+        ("Wireless Communication", "Understand wireless transmission concepts.", "Wireless communication lessons", 3),
+        ("Wireless Technologies", "Study common wireless communication systems.", "Wireless systems tutorials", 3)
     ]
 }
 
-
-# ==========================================
-# HELPER FUNCTIONS
-# ==========================================
-
-def get_or_create_student(
-    db,
-    student_key,
-    name="Student",
-    career=None
-):
-    student = db.query(Student).filter_by(
-        student_key=student_key
-    ).first()
-
-    if not student:
-        student = Student(
-            student_key=student_key,
-            name=name,
-            career=career or "Software Developer"
-        )
-        db.add(student)
-    else:
-        student.name = name or student.name
-
-        if career:
-            student.career = career
-
-    db.commit()
-    db.refresh(student)
-
-    return student
 
 # ==========================================
 # AUTHENTICATION HELPERS
@@ -626,6 +319,84 @@ def validate_email(email: str):
         )
 
     return email
+
+
+def get_current_student(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    db: Session = Depends(get_db)
+):
+    if credentials is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Please sign in to continue"
+        )
+
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            SECRET_KEY,
+            algorithms=[JWT_ALGORITHM]
+        )
+
+        student_key = payload.get("sub")
+
+        if not student_key:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid authentication token"
+            )
+
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=401,
+            detail="Your session has expired. Please sign in again."
+        )
+
+    student = db.query(Student).filter_by(
+        student_key=student_key
+    ).first()
+
+    if not student:
+        raise HTTPException(
+            status_code=401,
+            detail="Student account not found"
+        )
+
+    return student
+
+
+# ==========================================
+# STUDENT HELPERS
+# ==========================================
+
+def get_or_create_student(
+    db,
+    student_key,
+    name="Student",
+    career=None
+):
+    student = db.query(Student).filter_by(
+        student_key=student_key
+    ).first()
+
+    if not student:
+        student = Student(
+            student_key=student_key,
+            name=name,
+            career=career or "Software Developer"
+        )
+        db.add(student)
+    else:
+        student.name = name or student.name
+
+        if career:
+            student.career = career
+
+    db.commit()
+    db.refresh(student)
+
+    return student
+
 
 def award_badge(
     db,
@@ -693,6 +464,14 @@ def task_to_dict(task):
     }
 
 
+def verify_student_access(requested_key, current_student):
+    if requested_key.strip().lower() != current_student.student_key:
+        raise HTTPException(
+            status_code=403,
+            detail="You cannot access another student's information"
+        )
+
+
 # ==========================================
 # HOME AND HEALTH CHECK
 # ==========================================
@@ -758,7 +537,6 @@ def register_student(
             )
             db.add(student)
         else:
-            # Preserve existing learning records.
             student.name = data.name.strip()
             student.career = career
             student.password_hash = password_hasher.hash(data.password)
@@ -819,6 +597,18 @@ def login_student(
     }
 
 
+@app.get("/api/auth/me")
+def get_my_account(
+    current_student: Student = Depends(get_current_student)
+):
+    return {
+        "student": {
+            "name": current_student.name,
+            "email": current_student.student_key,
+            "career": current_student.career
+        }
+    }
+
 
 # ==========================================
 # GENERATE PERSONALIZED ROADMAP
@@ -827,13 +617,16 @@ def login_student(
 @app.post("/api/roadmap/generate")
 def generate_roadmap(
     data: RoadmapRequest,
+    current_student: Student = Depends(get_current_student),
     db: Session = Depends(get_db)
 ):
+    student_key = current_student.student_key
+
     try:
         get_or_create_student(
             db,
-            data.student_key,
-            data.name,
+            student_key,
+            current_student.name,
             data.career
         )
 
@@ -841,9 +634,7 @@ def generate_roadmap(
 
         for requirement in data.requirements:
             current_score = float(
-                data.assessed_skills.get(
-                    requirement.skill, 0
-                )
+                data.assessed_skills.get(requirement.skill, 0)
             )
 
             gap = max(
@@ -852,12 +643,10 @@ def generate_roadmap(
             )
 
             if gap > 0:
-                priority = gap * requirement.weight
-
                 gaps.append({
                     "skill": requirement.skill,
                     "gap": gap,
-                    "priority": priority
+                    "priority": gap * requirement.weight
                 })
 
         gaps.sort(
@@ -895,9 +684,8 @@ def generate_roadmap(
             )
 
             for title, description, resource, days in steps:
-
                 existing = db.query(RoadmapTask).filter_by(
-                    student_key=data.student_key,
+                    student_key=student_key,
                     career=data.career,
                     skill=skill,
                     title=title
@@ -906,8 +694,8 @@ def generate_roadmap(
                 if existing:
                     existing.order_index = order
                 else:
-                    task = RoadmapTask(
-                        student_key=data.student_key,
+                    db.add(RoadmapTask(
+                        student_key=student_key,
                         career=data.career,
                         skill=skill,
                         title=title,
@@ -915,16 +703,14 @@ def generate_roadmap(
                         resource_hint=resource,
                         estimated_days=days,
                         order_index=order
-                    )
-
-                    db.add(task)
+                    ))
 
                 order += 1
 
         db.commit()
 
         tasks = db.query(RoadmapTask).filter_by(
-            student_key=data.student_key,
+            student_key=student_key,
             career=data.career
         ).order_by(
             RoadmapTask.order_index
@@ -942,11 +728,15 @@ def generate_roadmap(
             ]
         }
 
-    except Exception as error:
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except Exception:
         db.rollback()
         raise HTTPException(
             status_code=500,
-            detail=str(error)
+            detail="Unable to generate roadmap. Please try again."
         )
 
 
@@ -958,10 +748,13 @@ def generate_roadmap(
 def get_roadmap(
     student_key: str,
     career: Optional[str] = None,
+    current_student: Student = Depends(get_current_student),
     db: Session = Depends(get_db)
 ):
+    verify_student_access(student_key, current_student)
+
     query = db.query(RoadmapTask).filter_by(
-        student_key=student_key
+        student_key=current_student.student_key
     )
 
     if career:
@@ -986,11 +779,14 @@ def get_roadmap(
 def update_task(
     task_id: int,
     data: CompletionRequest,
+    current_student: Student = Depends(get_current_student),
     db: Session = Depends(get_db)
 ):
+    student_key = current_student.student_key
+
     task = db.query(RoadmapTask).filter_by(
         id=task_id,
-        student_key=data.student_key
+        student_key=student_key
     ).first()
 
     if not task:
@@ -1009,7 +805,7 @@ def update_task(
     db.refresh(task)
 
     if data.completed:
-        check_task_badges(db, data.student_key)
+        check_task_badges(db, student_key)
 
     return {
         "message": "Task updated successfully",
@@ -1024,6 +820,7 @@ def update_task(
 @app.post("/api/quizzes")
 def save_quiz(
     data: QuizRequest,
+    current_student: Student = Depends(get_current_student),
     db: Session = Depends(get_db)
 ):
     if data.correct_answers > data.total_questions:
@@ -1042,13 +839,10 @@ def save_quiz(
             detail="Score does not match correct answers and total questions"
         )
 
-    get_or_create_student(
-        db,
-        data.student_key
-    )
+    student_key = current_student.student_key
 
     record = QuizRecord(
-        student_key=data.student_key,
+        student_key=student_key,
         skill=data.skill,
         score=data.score,
         total_questions=data.total_questions,
@@ -1062,7 +856,7 @@ def save_quiz(
     if data.score >= 80:
         award_badge(
             db,
-            data.student_key,
+            student_key,
             "quiz_star",
             "Quiz Star",
             "Scored at least 80% in a skill quiz."
@@ -1082,15 +876,13 @@ def save_quiz(
 @app.post("/api/projects")
 def save_project(
     data: ProjectRequest,
+    current_student: Student = Depends(get_current_student),
     db: Session = Depends(get_db)
 ):
-    get_or_create_student(
-        db,
-        data.student_key
-    )
+    student_key = current_student.student_key
 
     project = ProjectRecord(
-        student_key=data.student_key,
+        student_key=student_key,
         title=data.title,
         description=data.description,
         skills_used=", ".join(data.skills_used),
@@ -1104,7 +896,7 @@ def save_project(
 
     award_badge(
         db,
-        data.student_key,
+        student_key,
         "project_builder",
         "Project Builder",
         "Recorded your first project in SkillBridge."
@@ -1123,8 +915,13 @@ def save_project(
 @app.get("/api/passport/{student_key}")
 def get_passport(
     student_key: str,
+    current_student: Student = Depends(get_current_student),
     db: Session = Depends(get_db)
 ):
+    verify_student_access(student_key, current_student)
+
+    student_key = current_student.student_key
+
     student = db.query(Student).filter_by(
         student_key=student_key
     ).first()
@@ -1201,8 +998,13 @@ def get_passport(
 @app.get("/api/dashboard/{student_key}")
 def dashboard_summary(
     student_key: str,
+    current_student: Student = Depends(get_current_student),
     db: Session = Depends(get_db)
 ):
+    verify_student_access(student_key, current_student)
+
+    student_key = current_student.student_key
+
     tasks = db.query(RoadmapTask).filter_by(
         student_key=student_key
     ).all()
@@ -1252,3 +1054,4 @@ def api_home():
         "version": "1.0.0",
         "message": "Backend API is ready"
     }
+
