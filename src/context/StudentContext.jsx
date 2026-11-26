@@ -10,7 +10,7 @@ const StudentContext = createContext(null)
 
 const STORAGE_KEY = 'skillbridge-student'
 const TOKEN_KEY = 'skillbridge-token'
-const API_URL = 'http://127.0.0.1:8000'
+const API_URL = 'https://skill-bridge-y9zr.onrender.com'
 
 function createAvatar(name = '') {
   return name

@@ -18,7 +18,7 @@ import {
 } from '../data/skillEngine'
 import { useStudent } from '../context/StudentContext'
 
-const API_URL = 'http://127.0.0.1:8000'
+const API_URL = 'https://skill-bridge-y9zr.onrender.com'
 
 const fieldClass =
   'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100'

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { useStudent } from '../context/StudentContext'
 
-const API_URL = 'http://127.0.0.1:8000'
+const API_URL = 'https://skill-bridge-y9zr.onrender.com'
 
 function formatDate(value) {
   if (!value) return 'Recently added'

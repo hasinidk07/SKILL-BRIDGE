@@ -25,7 +25,7 @@ export default function LoginPage() {
 
     try {
       const response = await fetch(
-        'http://127.0.0.1:8000/api/auth/login',
+        'https://skill-bridge-y9zr.onrender.com/api/auth/login',
         {
           method: 'POST',
           headers: {
